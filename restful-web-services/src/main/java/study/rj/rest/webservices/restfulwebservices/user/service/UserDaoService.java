@@ -1,7 +1,7 @@
 package study.rj.rest.webservices.restfulwebservices.user.service;
 
 import org.springframework.stereotype.Component;
-import study.rj.rest.webservices.restfulwebservices.user.model.User;
+import study.rj.rest.webservices.restfulwebservices.user.entity.User;
 
 import java.util.ArrayList;
 import java.util.Date;

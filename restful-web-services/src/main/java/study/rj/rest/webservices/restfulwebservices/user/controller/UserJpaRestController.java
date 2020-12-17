@@ -6,29 +6,34 @@ import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import study.rj.rest.webservices.restfulwebservices.user.entity.Post;
 import study.rj.rest.webservices.restfulwebservices.user.exception.UserNotFoundException;
 import study.rj.rest.webservices.restfulwebservices.user.entity.User;
-import study.rj.rest.webservices.restfulwebservices.user.service.UserDaoService;
+import study.rj.rest.webservices.restfulwebservices.user.repository.PostRepository;
+import study.rj.rest.webservices.restfulwebservices.user.repository.UserRepository;
 
 import javax.validation.Valid;
 import java.net.URI;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
-@RequestMapping("/users")
-public class UserRestController {
+@RequestMapping("/users/jpa")
+public class UserJpaRestController {
 
     @Autowired
-    UserDaoService userDaoService;
+    UserRepository userRepository;
+    @Autowired
+    PostRepository postRepository;
 
     @GetMapping
     public List<User> retrieveAllUsers() {
-        return userDaoService.findAll();
+        return (List<User>) userRepository.findAll();
     }
 
     @PostMapping
     public ResponseEntity<User> createUser(@Valid @RequestBody User user) {
-        User savedUser = userDaoService.save(user);
+        User savedUser = userRepository.save(user);
 
         // /users/{id}
         URI location = ServletUriComponentsBuilder
@@ -42,13 +47,13 @@ public class UserRestController {
 
     @GetMapping("/{id}")
     public EntityModel<User> retrieveUser(@PathVariable(name = "id") int id) {
-        User user = userDaoService.findOne(id);
+        Optional<User> user = userRepository.findById(id);
 
-        if (user == null)
+        if (user.isEmpty())
             throw new UserNotFoundException("id-" + id);
 
         // HATEOAS
-        EntityModel<User> entityModel = EntityModel.of(user);
+        EntityModel<User> entityModel = EntityModel.of(user.get());
         WebMvcLinkBuilder linkTo = WebMvcLinkBuilder
                 .linkTo(WebMvcLinkBuilder.methodOn(this.getClass()).retrieveAllUsers());
         entityModel.add(linkTo.withRel("all-users"));
@@ -58,22 +63,41 @@ public class UserRestController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<User> deleteUser(@PathVariable(name = "id") int id) {
-        User deletedUser = userDaoService.deleteById(id);
-
-        if (deletedUser == null)
-            throw new UserNotFoundException("id-" + id);
+        userRepository.deleteById(id);
 
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/posts")
-    public void getAllUserPosts(@PathVariable(name = "id") String id) {
+    public List<Post> getAllUserPosts(@PathVariable(name = "id") int id) {
+        Optional<User> user = userRepository.findById(id);
+        if (user.isEmpty())
+            throw new UserNotFoundException("id-" + id);
+
+        return user.get().getPosts();
 
     }
 
     @PostMapping("/{id}/posts")
-    public void createUserPost(@PathVariable(name = "id") String id) {
+    public ResponseEntity<Object> createUserPost(@PathVariable(name = "id") int id, @RequestBody Post post) {
+        Optional<User> userOptional = userRepository.findById(id);
+        if (userOptional.isEmpty())
+            throw new UserNotFoundException("id-" + id);
 
+        User user = userOptional.get();
+
+        post.setUser(user);
+
+        postRepository.save(post);
+
+
+        URI location = ServletUriComponentsBuilder
+                .fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(post.getId())
+                .toUri();
+
+        return ResponseEntity.created(location).build();
     }
 
     @GetMapping("/{id}/posts/{post_id}")
